@@ -1,2 +1,2 @@
-from .imgproc import gauss
-from .numalg import *
+from .imgproc import *
+from .alg import *
