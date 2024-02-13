@@ -30,6 +30,10 @@ def gauss(x, sigma):
 def gauss_deriv(x, sigma):
     return -x/(sigma**3 * np.sqrt(2* np.pi)) * np.exp(-x**2/(2*sigma**2))
 
+def gauss_2nd_deriv(x, sigma):
+    return 1/(np.sqrt(2*np.pi)*sigma**5)*(-sigma**2 + x**2) * np.exp(-x**2/(2*sigma**2))
+
+
 def dist_arr(s):
     """
     :param s: Parameter determining size of array.
@@ -37,6 +41,27 @@ def dist_arr(s):
     """
     return np.array([i for i in range(-s, s+1)]) 
 
+
+def gauss_kernel1d(sigma, s = None):
+    if s is None:
+        s = 5 * sigma
+    s = math.ceil(s)
+    x = dist_arr(s)
+    return gauss(x, sigma)
+
+def gauss_deriv_kernel1d(sigma, s = None):
+    if s is None:
+        s = 5 * sigma
+    s = math.ceil(s)
+    x = dist_arr(s)
+    return gauss_deriv(x, sigma)
+
+def gauss_2nd_deriv_kernel1d(sigma, s = None):
+    if s is None:
+        s = 5 * sigma
+    s = math.ceil(s)
+    x = dist_arr(s)
+    return gauss_2nd_deriv(x, sigma)
 
 def gauss_kernel(sigma, s = None, dim = 2):
     if s is None:
@@ -67,23 +92,6 @@ def gauss_deriv_kernel(sigma, s = None, dim = 2, axis = 0):
             ker = np.outer(ker, gauss_deriv(x, sigma))
     return ker.reshape(*[s*2+1]*dim)
 
-
-
-def apply_gauss(img, sigma, s = None):
-    kernel = gauss_kernel(sigma, s, 2)
-    return convolve(img, kernel)
-
-def apply_gauss_deriv(img,sigma, s = None, axis = 0):
-    if s is None:
-        s = 5 * sigma
-    s = math.ceil(s)
-    ker = gauss_deriv_kernel(sigma, s, dim = len(img.shape), axis=axis)
-    return convolve(img, ker)
-
-
-def gauss_2nd_deriv(x, sigma):
-    return 1/(np.sqrt(2*np.pi)*sigma**5)*(-sigma**2 + x**2) * np.exp(-x**2/(2*sigma**2))
-
 def gauss_2nd_deriv_kernel(sigma, s = None, dim = 2, axis = 0):
     if s is None:
         s = 5 * sigma
@@ -102,15 +110,30 @@ def gauss_2nd_deriv_kernel(sigma, s = None, dim = 2, axis = 0):
     return ker.reshape(*[s*2+1]*dim)
 
 
-def apply_gauss_sep(img, sigma, s = None):
-    kernel = gauss_kernel(sigma, s, 1)
+
+"""
+def apply_gauss(img, sigma, s = None):
+    kernel = gauss_kernel(sigma, s, 2)
+    return convolve(img, kernel)
+
+def apply_gauss_deriv(img,sigma, s = None, axis = 0):
+    if s is None:
+        s = 5 * sigma
+    s = math.ceil(s)
+    ker = gauss_deriv_kernel(sigma, s, dim = len(img.shape), axis=axis)
+    return convolve(img, ker)
+"""
+
+
+def apply_gauss(img, sigma, s = None):
+    kernel = gauss_kernel1d(sigma, s)
     for i in range(len(img.shape)):
         img = convolve1d(img, kernel, axis=i)
     return img
 
-def apply_gauss_deriv_sep(img, axis, sigma, s = None):
-    kernel = gauss_kernel(sigma, s, 1)
-    dkernel = gauss_deriv_kernel(sigma, s, 1)
+def apply_gauss_deriv(img, axis, sigma, s = None):
+    kernel = gauss_kernel1d(sigma, s)
+    dkernel = gauss_deriv_kernel1d(sigma, s)
     for i in range(len(img.shape)):
         if i == axis:
             img = convolve1d(img, dkernel, axis=i)
@@ -118,9 +141,9 @@ def apply_gauss_deriv_sep(img, axis, sigma, s = None):
             img = convolve1d(img, kernel, axis=i)
     return img
 
-def apply_gauss_2nd_deriv_sep(img, axis, sigma, s = None):
-    kernel = gauss_kernel(sigma, s, 1)
-    ddkernel = gauss_2nd_deriv_kernel(sigma, s, 1)
+def apply_gauss_2nd_deriv(img, axis, sigma, s = None):
+    kernel = gauss_kernel1d(sigma, s, 1)
+    ddkernel = gauss_2nd_deriv_kernel1d(sigma, s, 1)
     for i in range(len(img.shape)):
         if i == axis:
             img = convolve1d(img, ddkernel, axis=i)
@@ -132,8 +155,10 @@ def laplacian(img, sigma, s = None):
     img = img.astype(float)
     ker2 = gauss_2nd_deriv_kernel(sigma, s, dim=1)
     ker1 = gauss_kernel(sigma, s, dim=1)
-    Lxx = convolve1d(convolve1d(img, ker2, axis=1), ker1, axis=0)
-    Lyy = convolve1d(convolve1d(img, ker2, axis=0), ker1, axis=1)
+    #Lxx = convolve1d(convolve1d(img, ker2, axis=1), ker1, axis=0)
+    #Lyy = convolve1d(convolve1d(img, ker2, axis=0), ker1, axis=1)
+    Lxx = apply_gauss_2nd_deriv(img, 0, sigma, s)
+    Lxx = apply_gauss_2nd_deriv(img, 1, sigma, s)
     return Lxx + Lyy
 
 
