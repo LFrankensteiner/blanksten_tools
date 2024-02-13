@@ -142,8 +142,8 @@ def apply_gauss_deriv(img, axis, sigma, s = None):
     return img
 
 def apply_gauss_2nd_deriv(img, axis, sigma, s = None):
-    kernel = gauss_kernel1d(sigma, s, 1)
-    ddkernel = gauss_2nd_deriv_kernel1d(sigma, s, 1)
+    kernel = gauss_kernel1d(sigma, s)
+    ddkernel = gauss_2nd_deriv_kernel1d(sigma, s)
     for i in range(len(img.shape)):
         if i == axis:
             img = convolve1d(img, ddkernel, axis=i)
@@ -153,8 +153,8 @@ def apply_gauss_2nd_deriv(img, axis, sigma, s = None):
 
 def laplacian(img, sigma, s = None):
     img = img.astype(float)
-    ker2 = gauss_2nd_deriv_kernel(sigma, s, dim=1)
-    ker1 = gauss_kernel(sigma, s, dim=1)
+    #ker2 = gauss_2nd_deriv_kernel(sigma, s, dim=1)
+    #ker1 = gauss_kernel(sigma, s, dim=1)
     #Lxx = convolve1d(convolve1d(img, ker2, axis=1), ker1, axis=0)
     #Lyy = convolve1d(convolve1d(img, ker2, axis=0), ker1, axis=1)
     Lxx = apply_gauss_2nd_deriv(img, 0, sigma, s)
