@@ -102,6 +102,32 @@ def gauss_2nd_deriv_kernel(sigma, s = None, dim = 2, axis = 0):
     return ker.reshape(*[s*2+1]*dim)
 
 
+def apply_gauss_sep(img, sigma, s = None):
+    kernel = gauss_kernel(sigma, s, 1)
+    for i in range(len(img.shape)):
+        img = convolve1d(img, kernel, axis=i)
+    return img
+
+def apply_gauss_deriv_sep(img, axis, sigma, s = None):
+    kernel = gauss_kernel(sigma, s, 1)
+    dkernel = gauss_deriv_kernel(sigma, s, 1)
+    for i in range(len(img.shape)):
+        if i == axis:
+            img = convolve1d(img, dkernel, axis=i)
+        else: 
+            img = convolve1d(img, kernel, axis=i)
+    return img
+
+def apply_gauss_2nd_deriv_sep(img, axis, sigma, s = None):
+    kernel = gauss_kernel(sigma, s, 1)
+    ddkernel = gauss_2nd_deriv_kernel(sigma, s, 1)
+    for i in range(len(img.shape)):
+        if i == axis:
+            img = convolve1d(img, ddkernel, axis=i)
+        else: 
+            img = convolve1d(img, kernel, axis=i)
+    return img
+
 def laplacian(img, sigma, s = None):
     img = img.astype(float)
     ker2 = gauss_2nd_deriv_kernel(sigma, s, dim=1)
