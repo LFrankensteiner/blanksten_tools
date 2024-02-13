@@ -1,13 +1,14 @@
 import cv2 as cv
 import numpy as np
 from matplotlib import pyplot as plt
-import scipy as sp
-from scipy.ndimage import *
-from skimage import io, color, segmentation, measure
-import os
 import matplotlib.cm as cm
 import matplotlib.animation as animation
-from skimage import io, color, morphology
+import scipy as sp
+from scipy.ndimage import *
+from skimage import io, color, segmentation, measure, morphology
+from skimage.util import img_as_ubyte
+from skimage import img_as_ubyte, img_as_float
+import os
 from skimage.morphology import erosion, dilation, opening, closing, binary_opening, binary_closing, disk
 import math
 from skimage.color import label2rgb
@@ -20,9 +21,7 @@ from scipy.spatial.transform import Rotation
 from math import ceil
 import SimpleITK as sitk
 from IPython.display import clear_output
-from skimage.util import img_as_ubyte
-from skimage import img_as_ubyte, img_as_float
-import os
+
 from scipy.linalg import circulant
 
 def gauss(x, sigma):
@@ -102,7 +101,9 @@ def gauss_2nd_deriv_kernel(sigma, s = None, dim = 2, axis = 0):
             ker = np.outer(ker, gauss_2nd_deriv(x, sigma))
     return ker.reshape(*[s*2+1]*dim)
 
+
 def laplacian(img, sigma, s = None):
+    img = img.astype(float)
     ker2 = gauss_2nd_deriv_kernel(sigma, s, dim=1)
     ker1 = gauss_kernel(sigma, s, dim=1)
     Lxx = convolve1d(convolve1d(img, ker2, axis=1), ker1, axis=0)
@@ -317,6 +318,9 @@ def gamma_map(img, gamma):
     return img_gam
 
 def RLE_encoder(img):
+    """
+    probably wrong lol
+    """
     img = img.flatten()
     encoded = []
     prev = img[0]
@@ -333,6 +337,9 @@ def RLE_encoder(img):
     return encoded
 
 def RLE_decoder(encoded, shape=None):
+    """
+    probably wrong lol
+    """
     img = []
     for num, val in encoded:
         img += [val] * num
@@ -342,6 +349,9 @@ def RLE_decoder(encoded, shape=None):
             
 
 def chain_coder(startpixel, seq):
+    """
+    probably wrong lol
+    """
     instructions = {
         0 : np.array([0,1]),
         1 : np.array([-1,1]),
