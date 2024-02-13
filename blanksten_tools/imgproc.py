@@ -63,6 +63,42 @@ def gauss_2nd_deriv_kernel1d(sigma, s = None):
     x = dist_arr(s)
     return gauss_2nd_deriv(x, sigma)
 
+
+
+def apply_gauss(img, sigma, s = None):
+    kernel = gauss_kernel1d(sigma, s)
+    for i in range(len(img.shape)):
+        img = convolve1d(img, kernel, axis=i)
+    return img
+
+def apply_gauss_deriv(img, axis, sigma, s = None):
+    kernel = gauss_kernel1d(sigma, s)
+    dkernel = gauss_deriv_kernel1d(sigma, s)
+    for i in range(len(img.shape)):
+        if i == axis:
+            img = convolve1d(img, dkernel, axis=i)
+        else: 
+            img = convolve1d(img, kernel, axis=i)
+    return img
+
+def apply_gauss_2nd_deriv(img, axis, sigma, s = None):
+    kernel = gauss_kernel1d(sigma, s)
+    ddkernel = gauss_2nd_deriv_kernel1d(sigma, s)
+    for i in range(len(img.shape)):
+        if i == axis:
+            img = convolve1d(img, ddkernel, axis=i)
+        else: 
+            img = convolve1d(img, kernel, axis=i)
+    return img
+
+def laplacian(img, sigma, s = None):
+    img = img.astype(float)
+    Lxx = apply_gauss_2nd_deriv(img, 0, sigma, s)
+    Lxx = apply_gauss_2nd_deriv(img, 1, sigma, s)
+    return Lxx + Lyy
+
+
+
 def gauss_kernel(sigma, s = None, dim = 2):
     if s is None:
         s = 5 * sigma
@@ -108,58 +144,6 @@ def gauss_2nd_deriv_kernel(sigma, s = None, dim = 2, axis = 0):
         else:
             ker = np.outer(ker, gauss_2nd_deriv(x, sigma))
     return ker.reshape(*[s*2+1]*dim)
-
-
-
-"""
-def apply_gauss(img, sigma, s = None):
-    kernel = gauss_kernel(sigma, s, 2)
-    return convolve(img, kernel)
-
-def apply_gauss_deriv(img,sigma, s = None, axis = 0):
-    if s is None:
-        s = 5 * sigma
-    s = math.ceil(s)
-    ker = gauss_deriv_kernel(sigma, s, dim = len(img.shape), axis=axis)
-    return convolve(img, ker)
-"""
-
-
-def apply_gauss(img, sigma, s = None):
-    kernel = gauss_kernel1d(sigma, s)
-    for i in range(len(img.shape)):
-        img = convolve1d(img, kernel, axis=i)
-    return img
-
-def apply_gauss_deriv(img, axis, sigma, s = None):
-    kernel = gauss_kernel1d(sigma, s)
-    dkernel = gauss_deriv_kernel1d(sigma, s)
-    for i in range(len(img.shape)):
-        if i == axis:
-            img = convolve1d(img, dkernel, axis=i)
-        else: 
-            img = convolve1d(img, kernel, axis=i)
-    return img
-
-def apply_gauss_2nd_deriv(img, axis, sigma, s = None):
-    kernel = gauss_kernel1d(sigma, s)
-    ddkernel = gauss_2nd_deriv_kernel1d(sigma, s)
-    for i in range(len(img.shape)):
-        if i == axis:
-            img = convolve1d(img, ddkernel, axis=i)
-        else: 
-            img = convolve1d(img, kernel, axis=i)
-    return img
-
-def laplacian(img, sigma, s = None):
-    img = img.astype(float)
-    #ker2 = gauss_2nd_deriv_kernel(sigma, s, dim=1)
-    #ker1 = gauss_kernel(sigma, s, dim=1)
-    #Lxx = convolve1d(convolve1d(img, ker2, axis=1), ker1, axis=0)
-    #Lyy = convolve1d(convolve1d(img, ker2, axis=0), ker1, axis=1)
-    Lxx = apply_gauss_2nd_deriv(img, 0, sigma, s)
-    Lxx = apply_gauss_2nd_deriv(img, 1, sigma, s)
-    return Lxx + Lyy
 
 
 def segmentation_length(img):
