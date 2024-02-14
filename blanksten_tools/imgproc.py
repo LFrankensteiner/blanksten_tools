@@ -21,7 +21,7 @@ from scipy.spatial.transform import Rotation
 from math import ceil
 import SimpleITK as sitk
 from IPython.display import clear_output
-
+from skimage.transform import SimilarityTransform, warp
 from scipy.linalg import circulant
 
 def gauss(x, sigma):
@@ -63,8 +63,6 @@ def gauss_2nd_deriv_kernel1d(sigma, s = None):
     x = dist_arr(s)
     return gauss_2nd_deriv(x, sigma)
 
-
-
 def apply_gauss(img, sigma, s = None):
     kernel = gauss_kernel1d(sigma, s)
     for i in range(len(img.shape)):
@@ -94,9 +92,41 @@ def apply_gauss_2nd_deriv(img, axis, sigma, s = None):
 def laplacian(img, sigma, s = None):
     img = img.astype(float)
     Lxx = apply_gauss_2nd_deriv(img, 0, sigma, s)
-    Lxx = apply_gauss_2nd_deriv(img, 1, sigma, s)
+    Lyy = apply_gauss_2nd_deriv(img, 1, sigma, s)
     return Lxx + Lyy
 
+
+def scale_space(img, ts, recursions = False):
+    """
+
+    """
+    if recursions:
+        return recursive_scale_space(img, ts, recursions)
+    else:
+        return non_recursive_scale_space(img, ts)
+
+def recursive_scale_space(img, t, recursions):
+    """
+    """
+    img = img.astype(float)
+    img_scale_space = np.array(recursions * [img])
+    k = np.sqrt(2 * t)
+    for i in range(recursions):
+        print(k)
+        img_scale_space[i] = t * b.laplacian(img, np.sqrt(t), int(5 * np.sqrt(t)))
+        img = img_scale_space[i]
+        k *= np.sqrt(2 * t)
+    return img_scale_space
+
+def non_recursive_scale_space(img, ts):
+    """
+    """
+    img = img.astype(float)
+    img_scale_space = np.zeros((*img.shape, len(ts)))
+    for i,t in enumerate(ts):
+        laplace = b.laplacian(img, np.sqrt(t), int(5 * np.sqrt(t)))
+        img_scale_space[:,:,i] = t * laplace
+    return img_scale_space
 
 
 def gauss_kernel(sigma, s = None, dim = 2):
@@ -272,6 +302,117 @@ def compute_outline(bin_img):
     outline = np.logical_xor(dilated, bin_img)
     return outline
 
+
+def rot_2d(theta, degrees = False):
+    if degrees:
+        theta = np.radians(theta)
+    sint = np.sin(theta)
+    cost = np.cos(theta)
+    R = np.array([[cost, -sint], [sint, cost]])
+    return R
+
+def transform_point(p, s, R, t):
+    if not hasattr(R, "__len__"):
+        R = rot_2d(R)
+    q = s * R @ p + t
+    return q
+
+def transform_points(points, s, R, t):
+    q = np.array([transform_point(pi, s, R, t) for pi in points])
+    return q
+    
+def dist_to_centroid(p, avg = False, return_centroid = False):
+    mu = np.mean(p, axis=0)
+    dist = np.sqrt(np.sum((p - mu)**2,axis=1))
+    if avg:
+        dist = np.mean(dist)
+    if return_centroid: return dist, mu
+    return dist
+
+def centroid(p):
+    mu = np.mean(p, axis=0)
+    return mu
+
+def euclidean_norm(a):
+    return np.sqrt(np.dot(a, a))
+
+def avg_dist_to_point(points, p):
+    return np.mean([euclidean_norm(points[i] - p) for i in range(n)])
+
+def covariance_matrix(p, q, mup = False, muq = None):
+    if mup is None:
+        mup = centroid(p)
+    if muq is None:
+        muq = centroid(q)
+    C = np.sum([np.outer((q - muq)[i], (p - mup)[i]) for i in range(n)], axis=0)
+    return C
+
+def find_transform(p, q):
+    """
+    Finds scale (s), rotation (R) and translation (t), such that:
+    q - (s * R * p + t)
+    is minimized.
+    :param p: (n, 2)-np.array. Points pre-transformation.
+    :param q: (n, 2)-np.array. Points post-transformation.
+    :return s: Scale
+    :return R: Rotation matrix.
+    :return t: Translation.
+    """
+    if not np.array_equal(p.shape, q.shape):
+        return ":("
+    if p.shape[1] != 2:
+        if p.shape[0] == 2:
+            p = p.T
+            q = q.T
+        else:
+            return ":("
+
+    n = p.shape[1] 
+    mup = centroid(p)
+    muq = centroid(q)
+    s = avg_dist_to_point(q, muq) / avg_dist_to_point(p, mup)
+
+    C = covariance_matrix(p, q, mup, muq)
+
+    U, S, Vt = np.linalg.svd(C)
+    Rh = U @ Vt
+    D = np.array([[1, 0], [0, np.linalg.det(Rh)]])
+
+    R = Rh @ D
+    t = muq - s * R @ mup
+
+    return s, R, t
+
+
+
+def transform_img(img, s, rot, t):
+    trans_mat = SimilarityTransform(scale = s, rotation = rot, translation=t)
+    timg = warp(img, trans_mat.inverse)
+    return timg
+
+def match_sift(image1, image2, tol=0.6):
+    image1 = img_as_ubyte(image1)
+    image2 = img_as_ubyte(image2)
+    sift = cv.SIFT_create()
+    # find the keypoints and descriptors with SIFT
+    kp1, des1 = sift.detectAndCompute(image1,None)
+    kp2, des2 = sift.detectAndCompute(image2,None)
+    # BFMatcher with default params
+    bf = cv.BFMatcher()
+    matches = bf.knnMatch(des1,des2, k=2)
+    good = []
+    for m,n in matches:
+        if m.distance < tol*n.distance:
+            good.append([m])
+    p_coords = []
+    q_coords = []
+    for i in range(len(good)):
+        match = good[i][0]
+        p_idx = match.queryIdx
+        q_idx = match.trainIdx
+        p_coords.append(np.round(kp1[p_idx].pt).astype(int))
+        q_coords.append(np.round(kp2[q_idx].pt).astype(int))
+    return np.array(p_coords), np.array(q_coords)
 
 """
 idk wth this is lol

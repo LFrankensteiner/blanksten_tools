@@ -1,4 +1,31 @@
-from imgproc import apply_gauss_deriv
+from .imgproc import apply_gauss_deriv
+import numpy as np
+import matplotlib as plt
+import cv2 as cv
+from skimage import color
+
+def linearLSQ(A,y):
+    Q,R=np.linalg.qr(A,mode="reduced")
+    x=np.linalg.solve(R,Q.T@y)
+    return x
+
+def read_video_cv(video_path):
+    cap = cv.VideoCapture(video_path)
+    n_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
+    i = 0
+    dims = cap.read()[1].shape
+    allFrames = np.zeros([*dims[:2], n_frames])
+    for i in range(n_frames):
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = frame[:, :, ::-1]
+        cf = color.rgb2gray(frame)
+        allFrames[:,:,i] = cf
+        i += 1
+    cap.release()
+    return allFrames
+
 
 class OpticFlowVid:
     def __init__(self, V, sigma, s):
@@ -32,14 +59,16 @@ class OpticFlowVid:
                     flow[i].append({"pixel" : np.array([xi,yi]), "displacement" : dxdy})
         return flow
 
-    def optic_flow_vid(self, N, xstride, ystride):
+    def optic_flow_vid(self, N, xstride, ystride, min_len):
         flow = self.optic_flow_grid(N, xstride, ystride)
         for frame in range(self.frames):
             plt.cla()
             plt.imshow(self.frame(frame))
             flowi = flow[frame]
             for arr in flowi:
-                plt.arrow(*arr["pixel"], *arr["displacement"], length_includes_head=True, head_width=3, head_length=1)
+                if np.dot(*arr["displacement"]*2) > min_len:
+                    x, y = arr["pixel"]
+                    plt.arrow(*arr["pixel"], *arr["displacement"], length_includes_head=True, head_width=3, head_length=1)
             plt.pause(1/1000) 
 
     def optic_flow_from_grid(self, flow, min_len, interval = 1/1000):
@@ -52,5 +81,5 @@ class OpticFlowVid:
             for arr in flowi:
                 if np.dot(*arr["displacement"]*2) > min_len:
                     x, y = arr["pixel"]
-                    plt.arrow(x, y, *arr["displacement"], length_includes_head=True, head_width=3, head_length=1)
+                    plt.arrow(y, x, *arr["displacement"].T, length_includes_head=True, head_width=3, head_length=1, color="cyan")
             plt.pause(interval) 
