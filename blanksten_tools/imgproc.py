@@ -110,12 +110,9 @@ def recursive_scale_space(img, t, recursions):
     """
     img = img.astype(float)
     img_scale_space = np.array(recursions * [img])
-    k = np.sqrt(2 * t)
     for i in range(recursions):
-        print(k)
-        img_scale_space[i] = t * b.laplacian(img, np.sqrt(t), int(5 * np.sqrt(t)))
+        img_scale_space[i] = t * laplacian(img, np.sqrt(t), int(5 * np.sqrt(t)))
         img = img_scale_space[i]
-        k *= np.sqrt(2 * t)
     return img_scale_space
 
 def non_recursive_scale_space(img, ts):
@@ -124,7 +121,7 @@ def non_recursive_scale_space(img, ts):
     img = img.astype(float)
     img_scale_space = np.zeros((*img.shape, len(ts)))
     for i,t in enumerate(ts):
-        laplace = b.laplacian(img, np.sqrt(t), int(5 * np.sqrt(t)))
+        laplace = laplacian(img, np.sqrt(t), int(5 * np.sqrt(t)))
         img_scale_space[:,:,i] = t * laplace
     return img_scale_space
 
@@ -259,8 +256,6 @@ def threshold(img, tmin="otsu", tmax=255):
     :param tmax: Maximum threshold val, default is 255. Can also be "otsu".
     :return: Binary image 
     """
-    if len(img.shape) == 3:
-        img = color.rgb2gray(img)
     if tmin == "otsu":
         tmin = threshold_otsu(img)
     if tmax == "otsu":
