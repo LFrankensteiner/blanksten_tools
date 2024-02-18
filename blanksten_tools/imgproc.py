@@ -23,15 +23,7 @@ import SimpleITK as sitk
 from IPython.display import clear_output
 from skimage.transform import SimilarityTransform, warp
 from scipy.linalg import circulant
-
-def gauss(x, sigma):
-    return 1/np.sqrt(2 * np.pi * sigma**2) * np.exp(-x**2/(2 * sigma**2))
-
-def gauss_deriv(x, sigma):
-    return -x/(sigma**3 * np.sqrt(2* np.pi)) * np.exp(-x**2/(2*sigma**2))
-
-def gauss_2nd_deriv(x, sigma):
-    return 1/(np.sqrt(2*np.pi)*sigma**5)*(-sigma**2 + x**2) * np.exp(-x**2/(2*sigma**2))
+from .math_utils import gauss, gauss_deriv, gauss_2nd_deriv
 
 
 def dist_arr(s):
@@ -42,17 +34,31 @@ def dist_arr(s):
     return np.array([i for i in range(-s, s+1)]) 
 
 
+
 def gauss_kernel1d(sigma, s = None):
+    """
+    Creates 1d gaussian kernel.
+
+    :param sigma: Spread of distribution.
+    :param s: Parameter determining size of kernel.
+    :return: 1d np.array length 2s+1: gauss([-s, -s+1,..., -1, 0, 1,...,s-1, s])
+    """
     if s is None:
-        s = 5 * sigma
-    s = math.ceil(s)
+        s = int(5 * sigma)
     x = dist_arr(s)
     return gauss(x, sigma)
 
+
 def gauss_deriv_kernel1d(sigma, s = None):
+    """
+    Creates 1d gaussian derivate kernel.
+    
+    :param sigma: Spread of distribution.
+    :param s: Parameter determining size of kernel.
+    :return: 1d np.array length 2s+1: dgaus([-s, -s+1,..., -1, 0, 1,...,s-1, s])
+    """
     if s is None:
-        s = 5 * sigma
-    s = math.ceil(s)
+        s = int(5 * sigma)
     x = dist_arr(s)
     return gauss_deriv(x, sigma)
 
@@ -64,12 +70,29 @@ def gauss_2nd_deriv_kernel1d(sigma, s = None):
     return gauss_2nd_deriv(x, sigma)
 
 def apply_gauss(img, sigma, s = None):
+    """
+    Applies a gaussian filter to an "image" of arbitrary dimension.
+    
+    :param img: Image to apply filter on.
+    :param sigma: Spread of distribution.
+    :param s: Parameter determining size of kernel.
+    :return: np array with same shape as img. 
+    """
     kernel = gauss_kernel1d(sigma, s)
     for i in range(len(img.shape)):
         img = convolve1d(img, kernel, axis=i)
     return img
 
 def apply_gauss_deriv(img, axis, sigma, s = None):
+    """
+    Applies a gaussian derivative filter to an "image" of arbitrary dimension, with respect to a specified axis.
+    
+    :param img: Image to apply filter on.
+    :param axis: Axis of derivative.
+    :param sigma: Spread of distribution.
+    :param s: Parameter determining size of kernel.
+    :return: np array with same shape as img. 
+    """
     kernel = gauss_kernel1d(sigma, s)
     dkernel = gauss_deriv_kernel1d(sigma, s)
     for i in range(len(img.shape)):
@@ -296,88 +319,6 @@ def compute_outline(bin_img):
     dilated = dilation(bin_img, footprint)
     outline = np.logical_xor(dilated, bin_img)
     return outline
-
-
-def rot_2d(theta, degrees = False):
-    if degrees:
-        theta = np.radians(theta)
-    sint = np.sin(theta)
-    cost = np.cos(theta)
-    R = np.array([[cost, -sint], [sint, cost]])
-    return R
-
-def transform_point(p, s, R, t):
-    if not hasattr(R, "__len__"):
-        R = rot_2d(R)
-    q = s * R @ p + t
-    return q
-
-def transform_points(points, s, R, t):
-    q = np.array([transform_point(pi, s, R, t) for pi in points])
-    return q
-    
-def dist_to_centroid(p, avg = False, return_centroid = False):
-    mu = np.mean(p, axis=0)
-    dist = np.sqrt(np.sum((p - mu)**2,axis=1))
-    if avg:
-        dist = np.mean(dist)
-    if return_centroid: return dist, mu
-    return dist
-
-def centroid(p):
-    mu = np.mean(p, axis=0)
-    return mu
-
-def euclidean_norm(a):
-    return np.sqrt(np.dot(a, a))
-
-def avg_dist_to_point(points, p):
-    return np.mean([euclidean_norm(points[i] - p) for i in range(n)])
-
-def covariance_matrix(p, q, mup = False, muq = None):
-    if mup is None:
-        mup = centroid(p)
-    if muq is None:
-        muq = centroid(q)
-    C = np.sum([np.outer((q - muq)[i], (p - mup)[i]) for i in range(n)], axis=0)
-    return C
-
-def find_transform(p, q):
-    """
-    Finds scale (s), rotation (R) and translation (t), such that:
-    q - (s * R * p + t)
-    is minimized.
-    :param p: (n, 2)-np.array. Points pre-transformation.
-    :param q: (n, 2)-np.array. Points post-transformation.
-    :return s: Scale
-    :return R: Rotation matrix.
-    :return t: Translation.
-    """
-    if not np.array_equal(p.shape, q.shape):
-        return ":("
-    if p.shape[1] != 2:
-        if p.shape[0] == 2:
-            p = p.T
-            q = q.T
-        else:
-            return ":("
-
-    n = p.shape[1] 
-    mup = centroid(p)
-    muq = centroid(q)
-    s = avg_dist_to_point(q, muq) / avg_dist_to_point(p, mup)
-
-    C = covariance_matrix(p, q, mup, muq)
-
-    U, S, Vt = np.linalg.svd(C)
-    Rh = U @ Vt
-    D = np.array([[1, 0], [0, np.linalg.det(Rh)]])
-
-    R = Rh @ D
-    t = muq - s * R @ mup
-
-    return s, R, t
-
 
 
 def transform_img(img, s, rot, t):
